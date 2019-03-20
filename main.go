@@ -89,13 +89,14 @@ func getResponse(chapter_id string) {
 	}
 	defer rows.Close()
 	for rows.Next() {
+		var chapter_name string
 		var project_name string
 		var company_name string
-		var chapter_name string
-		if err := rows.Scan(&project_name, &company_name, &chapter_name); err != nil {
+		if err := rows.Scan(&chapter_name, &project_name, &company_name); err != nil {
 			log.Fatal(err)
 		}
-		Chapters = append(Chapters, Chapter{Project_name: project_name, Company_name: company_name, Chapter_name: chapter_name})
+		fmt.Println(project_name)
+		Chapters = append(Chapters, Chapter{Chapter_name: chapter_name, Project_name: project_name, Company_name: company_name})
 
 	}
 }
