@@ -12,6 +12,7 @@ import (
 
 var db *sql.DB
 
+// Why not use config file?
 const (
 	host     = "localhost"
 	port     = "5432"
@@ -20,20 +21,24 @@ const (
 	dbname   = "postgres"
 )
 
+// Should be using camel casing instead of snake casing
 type Chapter struct {
-	Company_name string    `json:"company"`
-	Project_name string    `json:"project"`
-	Chapter_name string    `json:"chapter"`
-	Version      []Version `json:"version"`
+	CompanyName string    `json:"company"`
+	ProjectName string    `json:"project"`
+	ChapterName string    `json:"chapter"`
+	// Does not follow the json tag names based on the coding task
+	// Should have been 'versions' instead of 'version'
+	Version     []Version `json:"versions"`
 }
 type Version struct {
-	Created_By         string `json:"created_by"`
-	Chapter_Version_Id int    `json:"chapter_version_id"`
-	Version_Number     int    `json:"version_number"`
-	Created            string `json:"created"`
-	Appversion         string `json:"appversion"`
+	CreatedBy        string `json:"created_by"`
+	ChapterVersionId int    `json:"chapter_version_id"`
+	VersionNumber    int    `json:"version_number"`
+	Created          string `json:"created"`
+	AppVersion       string `json:"appversion"`
 }
 
+// Why is this declared in the global scope?
 var Chapters []Chapter
 var Versions []Version
 
@@ -46,10 +51,8 @@ func main() {
 
 func initDb() {
 	var err error
-	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s "+
-		"password=%s dbname=%s sslmode=disable",
-		host, port,
-		user, password, dbname)
+	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		host, port, user, password, dbname)
 
 	db, err = sql.Open("postgres", psqlInfo)
 	if err != nil {
@@ -71,62 +74,105 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chapter_id := keys[0]
-	getResponse(chapter_id)
-	getVersionInfo(chapter_id)
+	chapterId := keys[0]
+	getResponse(chapterId)
+	getVersionInfo(chapterId)
+
 	w.Header().Set("Content-Type", "application/json")
 
+	// This logic is completely wrong here
+	// The results versions are added as a new chapter, meaning the result would be
+	/*
+		[
+	 		{
+				"company": "CtrlPrint",
+				"project": "Testnot",
+				"chapter": "Test Chapter  1",
+				"versions": null
+ 	 		},
+ 	  		{
+				"company": "",
+				"project": "",
+				"chapter": "",
+				"versions": [
+						{
+							"created_by": "ctrl-romain",
+							"chapter_version_id": 262,
+							"version_number": 4,
+							"created": "2015-08-26T10:49:53.059514Z",
+							"appversion": "CC 2015"
+						},
+						{
+							"created_by": "ctrl-jens",
+							"chapter_version_id": 261,
+							"version_number": 3,
+							"created": "2015-08-26T10:48:41.795795Z",
+							"appversion": "CC 2015"
+						}
+            		],
+					...
+			},
+ 	 	]
+	*/
 	Chapters = append(Chapters, Chapter{Version: Versions})
 
 	json.NewEncoder(w).Encode(Chapters)
 }
 
-func getResponse(chapter_id string) {
-	rows, err := db.Query("select chapter_name, project_name, company_name from chapter inner join project on chapter_id = $1 AND project_id = chapter_project_id inner join company on company_id = project_company_id", chapter_id)
-
+func getResponse(chapterId string) {
+	rows, err := db.Query(`select chapter_name, project_name, company_name 
+									from chapter 
+									inner join project on chapter_id = $1 AND project_id = chapter_project_id 
+									inner join company on company_id = project_company_id`,
+									chapterId)
 	if err != nil {
 		return
 	}
 	defer rows.Close()
+
 	for rows.Next() {
-		var chapter_name string
-		var project_name string
-		var company_name string
-		if err := rows.Scan(&chapter_name, &project_name, &company_name); err != nil {
+		var chapterName string
+		var projectName string
+		var companyName string
+		if err := rows.Scan(&chapterName, &projectName, &companyName); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Println(project_name)
-		Chapters = append(Chapters, Chapter{Chapter_name: chapter_name, Project_name: project_name, Company_name: company_name})
-
+		fmt.Println(projectName)
+		Chapters = append(Chapters, Chapter{ChapterName: chapterName, ProjectName: projectName, CompanyName: companyName})
 	}
 }
-func getVersionInfo(chapter_id string) {
-	rows, err := db.Query("SELECT person_username, chapter_version_id, chapter_version_number, chapter_version_create_date, chapter_version_appversion from chapter_version inner join person on person_id = chapter_version_person_id where chapter_version_chapter_id=$1", chapter_id)
+func getVersionInfo(chapterId string) {
+	rows, err := db.Query(`SELECT person_username, chapter_version_id, chapter_version_number, chapter_version_create_date, chapter_version_appversion 
+									from chapter_version 
+									  inner join person on person_id = chapter_version_person_id 
+									where chapter_version_chapter_id=$1`, chapterId)
 	if err != nil {
 		return
 	}
 	defer rows.Close()
+
 	for rows.Next() {
-		var person_username string
-		var chapter_version_id int
-		var chapter_version_number int
-		var chapter_version_create_date string
-		var chapter_version_appversion string
-		if err := rows.Scan(&person_username, &chapter_version_id, &chapter_version_number, &chapter_version_create_date, &chapter_version_appversion); err != nil {
+		var personUsername string
+		var chapterVersionId int
+		var chapterVersionNumber int
+		var chapterVersionCreateDate string
+		var chapterVersionAppversion string
+		if err := rows.Scan(&personUsername, &chapterVersionId, &chapterVersionNumber, &chapterVersionCreateDate, &chapterVersionAppversion); err != nil {
 			log.Fatal(err)
 		}
-		switch chapter_version_appversion {
+		// why not make this a function?
+		switch chapterVersionAppversion {
 		case "11.0":
 			chapter_version_appversion := "CC 2015"
-			Versions = append(Versions, Version{Created_By: person_username, Chapter_Version_Id: chapter_version_id, Version_Number: chapter_version_number, Created: chapter_version_create_date, Appversion: chapter_version_appversion})
+			Versions = append(Versions, Version{CreatedBy: personUsername, ChapterVersionId: chapterVersionId, VersionNumber: chapterVersionNumber, Created: chapterVersionCreateDate, AppVersion: chapter_version_appversion})
 
 		case "12.0":
 			chapter_version_appversion := "CC 2017"
-			Versions = append(Versions, Version{Created_By: person_username, Chapter_Version_Id: chapter_version_id, Version_Number: chapter_version_number, Created: chapter_version_create_date, Appversion: chapter_version_appversion})
+			Versions = append(Versions, Version{CreatedBy: personUsername, ChapterVersionId: chapterVersionId, VersionNumber: chapterVersionNumber, Created: chapterVersionCreateDate, AppVersion: chapter_version_appversion})
 
 		default:
 			chapter_version_appversion := "CC 2015"
-			Versions = append(Versions, Version{Created_By: person_username, Chapter_Version_Id: chapter_version_id, Version_Number: chapter_version_number, Created: chapter_version_create_date, Appversion: chapter_version_appversion})
+			Versions = append(Versions, Version{CreatedBy: personUsername, ChapterVersionId: chapterVersionId, VersionNumber: chapterVersionNumber, Created: chapterVersionCreateDate, AppVersion: chapter_version_appversion})
 		}
 
 	}
